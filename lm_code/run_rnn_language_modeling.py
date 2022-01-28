@@ -63,6 +63,36 @@ def format_inputs(inputs, max_seq_len, bidirectional=False):
         labels = labels.cuda()
     return { "input_ids": input_ids, "labels": labels }
 
+def format_inputs_saycam(inputs, max_seq_len, bidirectional=False):
+    # Format the inputs from the DataCollatorForLanguageModeling.
+    # Note: inputs will have shape batch_size x seq_len.
+    input_ids = inputs["input_ids"]
+    labels = inputs["labels"]
+    if input_ids.shape[1] > max_seq_len:
+        input_ids = input_ids[:, :max_seq_len]
+        labels = labels[:, :max_seq_len]
+    if bidirectional:
+        # Remove the first and last label (no corresponding predictions from
+        # either forward or backward).
+        labels = labels[:,1:-1]
+        # Forward and backward inputs.
+        # Remove last two forward inputs: last one has no corresponding label, and
+        # second to last one corresponds to a label with no backwards prediction.
+        input_ids = (input_ids[:,:-2], input_ids[:,2:])
+    else:
+        # Remove the first label (not predicted by forward) and the last
+        # input (no corresponding label).
+        # labels = labels[:,1:] # The first token is not a label.
+        # input_ids = input_ids[:,:-1] # The last token is not inputted.
+        pass
+    if torch.cuda.is_available():
+        if bidirectional:
+            input_ids = tuple([input.cuda() for input in input_ids])
+        else:
+            input_ids = input_ids.cuda()
+        labels = labels.cuda()
+    return { "input_ids": input_ids, "labels": labels }
+
 def evaluate(model, eval_dataloader, vocab_size, max_seq_len, training_step, log_file, bidirectional):
     # Evaluate the model on the development set.
     # Metrics output to the log file.
