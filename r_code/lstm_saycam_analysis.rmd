@@ -69,7 +69,7 @@ sigmoid_regression <- function(x, y, return_residuals=TRUE, increasing=TRUE, use
         }
       )
     }
-    if(attempt >= 20 & !get("completed_regression", env=env)) {
+    if(attempt >= 200 & !get("completed_regression", env=env)) {
       print("Error: maximum attempts reached.")
       return(NULL)
     }
@@ -135,8 +135,10 @@ fit_lm_sigmoids <- function(surprisal_file, outfile) {
     scores <- lm_surprisal_df %>% filter(lm_surprisal_df$Token == token)
     #print(log10(scores$Steps))
     #print(scores$MeanSurprisal)
-    sigmoid_params <- sigmoid_regression(scores$Steps, scores$MeanSurprisal,
+    sigmoid_params <- sigmoid_regression(log10(scores$Steps + 0.0001), scores$MeanSurprisal,
                                          return_residuals=FALSE, increasing=FALSE)
+    # sigmoid_params <- sigmoid_regression(scores$Steps, scores$MeanSurprisal,
+    #                                      return_residuals=FALSE, increasing=FALSE)    
     if (!is.null(sigmoid_params)){
       print(sigmoid_params)
       upper <- sigmoid_params[1]
@@ -192,22 +194,22 @@ get_lm_aoa <- function(sigmoid_file, outfile, cutoff_proportion=0.50, aoa_type="
       if ((cutoff <= lower & cutoff <= upper) |
           (initial_baseline <= final_baseline) |
           (upper < lower & scale > 0) | (upper > lower & scale < 0)) {
-        # aoa <- log10(max_step)
-        aoa <- max_step
+        aoa <- log10(max_step)
+        # aoa <- max_step
         print("Adjusted to max step.")
       } else if (cutoff >= upper & cutoff >= lower) {
         # Cutoff has higher surprisal than entire curve.
-        aoa <- min_step
-        # aoa <- log10(min_step)
+        # aoa <- min_step
+        aoa <- log10(min_step)
         print("Adjusted to min step.")
       } else {
         aoa <- (xmid-log((upper-lower)/(upper-cutoff)-1)*scale)
       }
     }
-    # aoa <- min(aoa, log10(max_step))
-    aoa <- min(aoa, max_step)
-    # aoa <- max(aoa, log10(min_step))
-    aoa <- max(aoa, min_step)
+    aoa <- min(aoa, log10(max_step))
+    # aoa <- min(aoa, max_step)
+    aoa <- max(aoa, log10(min_step))
+    # aoa <- max(aoa, min_step)
     lm_aoa_df <- rbind(lm_aoa_df, list(token, aoa, cutoff, max_surprisal, min_surprisal,
                                        upper, lower, xmid, scale), stringsAsFactors = FALSE)
   }
@@ -319,8 +321,8 @@ plot_word_curve <- function(word, outfile, lm_surprisal_file="", lm_aoa_file="",
     lower <- lm_word_df$ParamLower
     xmid <- lm_word_df$ParamXmid
     scale <- lm_word_df$ParamScale
-    lm_plot <- ggplot(word_surprisal_df, aes(x=Steps, y=MeanSurprisal)) +
-    #lm_plot <- ggplot(word_surprisal_df, aes(x=log10(Steps), y=MeanSurprisal)) +
+    # lm_plot <- ggplot(word_surprisal_df, aes(x=Steps, y=MeanSurprisal)) +
+    lm_plot <- ggplot(word_surprisal_df, aes(x=log10(Steps), y=MeanSurprisal)) +
       theme_bw() + geom_hline(yintercept=lm_cutoff, color="blue") +
       xlab(paste(lm_model_string, " Epochs", sep="")) +
       ylab("Mean surprisal") + scale_y_continuous(trans = "reverse") +
@@ -446,7 +448,7 @@ run_regressions <- function(is_lm=TRUE, child_aoa_file="", childes_file="",
 
 ```{r fit_lm_sigmoids, include=FALSE}
 
-for (model in c("lstm_saycam_train_updated")) {
+for (model in c("lstm_saycam_steps", "lstm_saycam_steps_train")) {
   cat("Running ", model, "...\n", sep="")
   cat("Fitting sigmoids...\n")
   surprisal_file <- paste("tacl_data/lm_data/", model, "_surprisals.txt", sep="")
@@ -466,7 +468,7 @@ for (model in c("lstm_saycam_train_updated")) {
   get_lm_aoa(sigmoid_file, aoa_file, aoa_type="midpoint")
 }
 
-for (model in c("lstm_saycam_train_updated")) {
+for (model in c("lstm_saycam_steps", "lstm_saycam_steps_train")) {
   cat("Running ", model, "...\n", sep="")
   sigmoid_file <- paste("tacl_data/lm_data/processed/", model, "_sigmoids.txt", sep="")
     aoa_file <- paste("tacl_data/lm_data/processed/thresholds/", model, "_aoa_010.txt", sep="")
@@ -507,7 +509,7 @@ child_aoa_file <- "tacl_data/child_data/child_aoa.tsv"
 
 # Curves for "eat".
 word <- "train"
-for (model in c("lstm_saycam_updated")) {
+for (model in c("lstm_saycam_steps", "lstm_saycam_steps_train")) {
   lower_model <- str_replace(tolower(model), "-", "")
   surprisal_file <- paste("tacl_data/lm_data/", lower_model, "_surprisals.txt", sep="")
   lm_aoa_file <- paste("tacl_data/lm_data/processed/", lower_model, "_aoa.txt", sep="")
